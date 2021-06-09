@@ -324,7 +324,7 @@ no_auto:
 
 	if ((ser = open (serdev, O_RDWR | O_NOCTTY)) == -1)
 	{
-		fprintf (stderr, "ERROR: could not open %s\n", serdev);
+		fprintf (stderr, "ERROR: could not open %s - %s\n", serdev, strerror (errno));
 		unlock_device (serdev);
 		return EXIT_FAILURE;
 	}
@@ -378,7 +378,7 @@ no_auto:
 		if (select (FD_SETSIZE, &testfds, NULL, NULL, NULL) < 0)
 		{
 #ifdef DEBUG
-			fprintf (stderr, "\nSelect error!\n");
+			fprintf (stderr, "\nERROR: select - %s\n", strerror (errno));
 #endif /* DEBUG */
 			goto EXIT;
 		}
