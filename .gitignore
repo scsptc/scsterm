@@ -38,3 +38,6 @@ scsterm
 *.su
 *.idb
 *.pdb
+
+# Backup files
+*.bak
