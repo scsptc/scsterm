@@ -42,6 +42,15 @@ If you don't want the automatic search, you can enter the device and baudrate as
 ./scsterm /dev/ttyUSB0 38400
 ```
 
+**Hint:** if you get a *permission denied* error, you normally have to add the user to the group dialout!
+```
+sudo usermod -a -G dialout <username>
+```
+replace <username> with your user name.
+
+**Log out and log in again to activate the changes!**
+
+
 Tested on
 - Debian 10
 - Ubuntu 20.04
