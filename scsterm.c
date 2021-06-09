@@ -39,6 +39,7 @@
 #include <stdbool.h>
 #include <signal.h>
 #include <string.h>
+#include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
@@ -163,14 +164,14 @@ static int find_devices (struct SCS_Devices devs[])
 	err = libusb_init (&ctx);
 	if (err)
 	{
-		fprintf (stderr, "Error: unable to initialize libusb: %i\n", err);
+		fprintf (stderr, "ERROR: unable to initialize libusb: %i\n", err);
 		goto error;
 	}
 
 	num_devs = libusb_get_device_list (ctx, &list);
 	if (num_devs < 0)
 	{
-		fprintf (stderr, "Error: getting device list: %li\n", num_devs);
+		fprintf (stderr, "ERROR: getting device list: %li\n", num_devs);
 		goto error1;
 	}
 
@@ -256,9 +257,8 @@ int main (int argc, char *argv[])
 	char buf[256];
 	struct termios options;
 	struct serial_struct sstruct;
-//	bool p4baud = false;
 	int baudrate;
-	int i, n;
+	int i, n, r;
 	int num = 0;
 	struct SCS_Devices devs[MAX_SCS_DEVICES];
 
@@ -276,10 +276,6 @@ int main (int argc, char *argv[])
 			baudrate = B115200;
 			goto no_auto;
 		}
-//		else if (!strncmp (argv[1], "4", 1))
-//		{
-//			p4baud = true;
-//		}
 	}
 
 	n = find_devices (devs);	// find all SCS USB devices
@@ -309,7 +305,7 @@ int main (int argc, char *argv[])
 
 		if (num < 1 || num > n)
 		{
-			fprintf (stderr, "Error: invalid input\n");
+			fprintf (stderr, "ERROR: invalid input\n");
 			goto ERR_EXIT;
 		}
 		num--;
@@ -323,18 +319,23 @@ int main (int argc, char *argv[])
 no_auto:
 	if (lock_device (serdev) < 0)
 	{
-		fprintf (stderr, "Error: could not lock %s\n", serdev);
+		fprintf (stderr, "ERROR: could not lock %s\n", serdev);
 		return EXIT_FAILURE;
 	}
 
 	if ((ser = open (serdev, O_RDWR | O_NOCTTY)) == -1)
 	{
-		fprintf (stderr, "Error: could not open %s\n", serdev);
+		fprintf (stderr, "ERROR: could not open %s\n", serdev);
 		unlock_device (serdev);
 		return EXIT_FAILURE;
 	}
 
-	tcgetattr (ser, &options);
+	r = tcgetattr (ser, &options);
+	if (r < 0)
+	{
+		fprintf (stderr, "ERROR: tcgetattr - %s\n", strerror (errno));
+		goto EXIT;
+	}
 
 	options.c_cc[VTIME] = 0;
 	options.c_cc[VMIN] = 1;
@@ -342,13 +343,22 @@ no_auto:
 	options.c_iflag |= IGNBRK;
 	options.c_oflag = 0;
 	options.c_lflag = 0;
+	options.c_cflag &= ~(CSIZE | CSTOPB | PARENB | PARODD | HUPCL);
 	options.c_cflag |= (CS8 | CRTSCTS | CREAD | CLOCAL);
-	options.c_cflag &= ~(CSTOPB | PARENB | PARODD | HUPCL);
 
-	cfsetispeed (&options, baudrate);
-	cfsetospeed (&options, baudrate);
+	r = cfsetspeed (&options, baudrate);
+	if (r < 0)
+	{
+		fprintf (stderr, "ERROR: could not set output baudrate - %s\n", strerror (errno));
+		goto EXIT;
+	}
 
-	tcsetattr (ser, TCSANOW, &options);
+	r = tcsetattr (ser, TCSANOW, &options);
+	if (r < 0)
+	{
+		fprintf (stderr, "ERROR: tcsetattr - %s\n", strerror (errno));
+		goto EXIT;
+	}
 
 	if (devs[num].type == 2 || devs[num].type == 3)	// is it a P4dragon ?
 	{
