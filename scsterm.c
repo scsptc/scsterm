@@ -80,7 +80,7 @@
  ********************************************************************/
 struct Modem {
 	const char *type;
-	const int baud;
+	const speed_t baud;
 };
 
 struct SCS_Devices {
@@ -234,6 +234,53 @@ error:
 
 
 /********************************************************************
+ * Convert from int to baudrate enum type
+ ********************************************************************/
+speed_t convert2Baud (int baud)
+{
+	speed_t speed;
+
+	switch (baud)
+	{
+		case 9600:
+			speed = B9600;
+			break;
+
+		case 19200:
+			speed = B19200;
+			break;
+
+		case 38400:
+			speed = B38400;
+			break;
+
+		case 57600:
+			speed = B57600;
+			break;
+
+		case 115200:
+		default:
+			speed = B115200;
+			break;
+
+		case 230400:
+			speed = B230400;
+			break;
+
+		case 460800:
+			speed = B460800;
+			break;
+
+		case 2000000:
+			speed = B2000000;
+			break;
+	}
+
+	return speed;
+}
+
+
+/********************************************************************
  * Signal handler
  ********************************************************************/
 void sigHandler (int sig)
@@ -257,7 +304,7 @@ int main (int argc, char *argv[])
 	char buf[256];
 	struct termios options;
 	struct serial_struct sstruct;
-	int baudrate;
+	speed_t baudrate;
 	int i, n, r;
 	int num = 0;
 	struct SCS_Devices devs[MAX_SCS_DEVICES];
@@ -267,13 +314,16 @@ int main (int argc, char *argv[])
 		"Copyright (C) 2005-2021 SCS GmbH & Co. KG, Hanau, Germany\n"
 		"press CTRL-C to end program\n\n");
 
-	if (argc > 1)
+	if (argc == 3)
 	{
-		if (!strncmp (argv[1], "/dev/tty", 8))
+		if (!strncmp (argv[1], "/dev/", 5))
 		{
-			//printf ("Device: %s\n", argv[1]);
+			int speed;
+
 			strcpy (serdev, argv[1]);
-			baudrate = B115200;
+			speed = strtol (argv[2], NULL, 10);
+			baudrate = convert2Baud (speed);
+			printf ("Using %s with %d baud\n", serdev, speed);
 			goto no_auto;
 		}
 	}
