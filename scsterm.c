@@ -42,7 +42,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <termios.h>
+#include <asm-generic/termbits.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <linux/serial.h>
@@ -93,12 +93,12 @@ struct SCS_Devices {
  * Global Variables
  ********************************************************************/
 const struct Modem modems[] = {
-	{"PTC-IIusb",			B115200},	// 0
-	{"Tracker / DSP TNC",	B38400},	// 1
-	{"P4dragon DR-7800",	B38400},	// 2
-	{"P4dragon DR-7400",	B38400},	// 3
+	{"PTC-IIusb",			115200},	// 0
+	{"Tracker / DSP TNC",	 38400},	// 1
+	{"P4dragon DR-7800",	829440},	// 2
+	{"P4dragon DR-7400",	829440},	// 3
 	{"", 0},							// 4
-	{"PTC-IIIusb",			B115200},	// 5
+	{"PTC-IIIusb",			115200},	// 5
 	{"", 0},							// 6
 	{"", 0}								// 7
 };
@@ -234,53 +234,6 @@ error:
 
 
 /********************************************************************
- * Convert from int to baudrate enum type
- ********************************************************************/
-speed_t convert2Baud (int baud)
-{
-	speed_t speed;
-
-	switch (baud)
-	{
-		case 9600:
-			speed = B9600;
-			break;
-
-		case 19200:
-			speed = B19200;
-			break;
-
-		case 38400:
-			speed = B38400;
-			break;
-
-		case 57600:
-			speed = B57600;
-			break;
-
-		case 115200:
-		default:
-			speed = B115200;
-			break;
-
-		case 230400:
-			speed = B230400;
-			break;
-
-		case 460800:
-			speed = B460800;
-			break;
-
-		case 2000000:
-			speed = B2000000;
-			break;
-	}
-
-	return speed;
-}
-
-
-/********************************************************************
  * Signal handler
  ********************************************************************/
 void sigHandler (int sig)
@@ -302,8 +255,7 @@ int main (int argc, char *argv[])
 	fd_set readfds, testfds;
 	ssize_t rd;
 	char buf[256];
-	struct termios options;
-	struct serial_struct sstruct;
+	struct termios2 options;
 	speed_t baudrate;
 	int i, n, r;
 	int num = 0;
@@ -318,12 +270,9 @@ int main (int argc, char *argv[])
 	{
 		if (!strncmp (argv[1], "/dev/", 5))
 		{
-			int speed;
-
 			strcpy (serdev, argv[1]);
-			speed = strtol (argv[2], NULL, 10);
-			baudrate = convert2Baud (speed);
-			printf ("Using %s with %d baud\n", serdev, speed);
+			baudrate = strtol (argv[2], NULL, 10);
+			printf ("Using %s with %d baud\n", serdev, baudrate);
 			goto no_auto;
 		}
 	}
@@ -380,7 +329,7 @@ no_auto:
 		return EXIT_FAILURE;
 	}
 
-	r = tcgetattr (ser, &options);
+	r = ioctl (ser, TCGETS2, &options);
 	if (r < 0)
 	{
 		fprintf (stderr, "ERROR: tcgetattr - %s\n", strerror (errno));
@@ -396,49 +345,17 @@ no_auto:
 	options.c_cflag &= ~(CSIZE | CSTOPB | PARENB | PARODD | HUPCL);
 	options.c_cflag |= (CS8 | CRTSCTS | CREAD | CLOCAL);
 
-	r = cfsetspeed (&options, baudrate);
-	if (r < 0)
-	{
-		fprintf (stderr, "ERROR: could not set output baudrate - %s\n", strerror (errno));
-		goto EXIT;
-	}
+	options.c_cflag &= ~CBAUD;
+	options.c_cflag |= CBAUDEX;
 
-	r = tcsetattr (ser, TCSANOW, &options);
+	options.c_ispeed = baudrate;
+	options.c_ospeed = baudrate;
+
+	r = ioctl (ser, TCSETS2, &options);
 	if (r < 0)
 	{
 		fprintf (stderr, "ERROR: tcsetattr - %s\n", strerror (errno));
 		goto EXIT;
-	}
-
-	if (devs[num].type == 2 || devs[num].type == 3)	// is it a P4dragon ?
-	{
-		// special P4dragon handling
-		printf ("Set the P4dragon special baudrate!\n");
-
-		// get serial_struct
-		if (ioctl (ser, TIOCGSERIAL, &sstruct) < 0)
-		{
-			fprintf (stderr, "Error: could not get comm ioctl\n");
-			close (ser);
-			unlock_device (serdev);
-			return EXIT_FAILURE;
-		}
-
-		if (!(sstruct.flags & ASYNC_SPD_CUST))	// test if the custom divisor is already selected
-		{
-			// set custom divisor to get 829440 baud
-			sstruct.custom_divisor = 29;
-			sstruct.flags |= ASYNC_SPD_CUST;
-
-			// set serial_struct
-			if (ioctl (ser, TIOCSSERIAL, &sstruct) < 0)
-			{
-				fprintf (stderr, "Error: could not set custom comm baud divisor\n");
-				close (ser);
-				unlock_device (serdev);
-				return EXIT_FAILURE;
-			}
-		}
 	}
 
 	signal (SIGALRM, sigHandler);
