@@ -58,10 +58,10 @@
     0xD011 SCS Tracker / DSP TNC
     0xD012 SCS P4dragon DR-7800
     0xD013 SCS P4dragon DR-7400
-    0xD014 -
+    0xD014 - not used
     0xD015 SCS PTC-IIIusb
-    0xD016 -
-    0xD017 -
+    0xD016 - not used
+    0xD017 - not used
 */
 
 
@@ -288,7 +288,12 @@ int main (int argc, char *argv[])
 	}
 #endif /* DEBUG */
 
-	if (n > 1)
+	if (!n)
+	{
+		printf ("No SCS devices found!\n");
+		goto ERR_EXIT;
+	}
+	else if (n > 1)
 	{
 		printf ("More than one SCS modem found! Plaese choose:\n");
 		for (i = 0; i < n; i++)
