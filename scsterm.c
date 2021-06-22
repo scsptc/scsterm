@@ -263,7 +263,7 @@ int main (int argc, char *argv[])
 
 	printf ("SCS Term\n"
 		"Version " VERSION "\n"
-		"Copyright (C) 2005-2021 SCS GmbH & Co. KG, Hanau, Germany\n"
+		"Copyright (C) 2005 - 2021 SCS GmbH & Co. KG, Hanau, Germany\n"
 		"press CTRL-C to end program\n\n");
 
 	if (argc == 3)
@@ -295,7 +295,7 @@ int main (int argc, char *argv[])
 	}
 	else if (n > 1)
 	{
-		printf ("More than one SCS modem found! Plaese choose:\n");
+		printf ("More than one SCS modem found! Please choose:\n");
 		for (i = 0; i < n; i++)
 		{
 			printf ("%d: %-16s %s\n", i + 1, devs[i].tty, modems[devs[i].type].type);
